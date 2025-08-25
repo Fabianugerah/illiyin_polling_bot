@@ -1,0 +1,43 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Dokumentasi API",
+        "description": "Documentation for API endpoints",
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000",
+            "description": "Demo API Server"
+        }
+    ],
+    "paths": {
+        "/api/telegram/send-poll": {
+            "post": {
+                "tags": [
+                    "Telegram Bot"
+                ],
+                "summary": "Kirim polling ke Telegram",
+                "operationId": "99a77d704320ab438fbfb34d4db03b4b",
+                "responses": {
+                    "200": {
+                        "description": "Polling berhasil dikirim"
+                    },
+                    "400": {
+                        "description": "Gagal mengirim polling"
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Telegram Bot",
+            "description": "Telegram Bot"
+        }
+    ]
+}
