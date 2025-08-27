@@ -23,9 +23,8 @@ class SendTelegramPoll extends Command
         $tz   = config('app.timezone', 'Asia/Jakarta');
         $now  = Carbon::now($tz);
         $today = Carbon::now()->locale('id')->isoFormat('dddd, D MMMM Y');
-        $tanggal = $now->isoFormat('D MMMM Y');
 
-        // Rules: Senin–Jumat saja, skip Dzuhur saat Jumat, (opsional) skip libur —
+        // Rules: Senin–Jumat saja, skip Dzuhur saat Jumatan
         if ($now->isWeekend()) {
             $this->info('Weekend — skip.');
             return self::SUCCESS;
@@ -34,14 +33,6 @@ class SendTelegramPoll extends Command
             $this->info('Jumat (Jum’atan) — skip Dzuhur.');
             return self::SUCCESS;
         }
-        // Optional: cek libur dari file JSON (storage/app/holidays.json)
-        if (Storage::exists('holidays.json')) {
-            $holidays = json_decode(Storage::get('holidays.json'), true) ?: [];
-            if (in_array($now->toDateString(), $holidays, true)) {
-                $this->info('Tanggal merah — skip.');
-                return self::SUCCESS;
-            }
-        }
 
         $token  = env('TELEGRAM_BOT_TOKEN');
         $chatId = env('TELEGRAM_CHAT_ID');
@@ -49,20 +40,20 @@ class SendTelegramPoll extends Command
         $question = "Sholat " . ucfirst($waktu) . " di Masjid ( $today )";
         $options  = ["Masjid", "Basecamp"];
 
-        $resp = Http::post("https://api.telegram.org/bot{$token}/sendPoll", [
+        $response = Http::post("https://api.telegram.org/bot{$token}/sendPoll", [
             'chat_id'      => $chatId,
             'question'     => $question,
             'options'      => json_encode($options),
             'is_anonymous' => false,
         ]);
 
-        if (! $resp->successful()) {
-            $this->error('Gagal kirim poll: '.$resp->body());
+        if (! $response->successful()) {
+            $this->error('Gagal kirim poll: '.$response->body());
             return self::FAILURE;
         }
 
-        $data = $resp->json();
-        // Simpan meta poll ke file (tanpa DB)
+        $data = $response->json();
+        // Simpan meta poll ke file summary
         $payload = [
             'sent_at'    => $now->toIso8601String(),
             'waktu'      => $waktu,

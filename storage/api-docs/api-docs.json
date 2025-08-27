@@ -16,19 +16,56 @@
         }
     ],
     "paths": {
-        "/api/telegram/send-poll": {
+        "/api/telegram/webhook": {
             "post": {
                 "tags": [
-                    "Telegram Bot"
+                    "Telegram"
                 ],
-                "summary": "Kirim polling ke Telegram",
-                "operationId": "99a77d704320ab438fbfb34d4db03b4b",
+                "summary": "Handle Telegram Webhook",
+                "description": "Menerima pilihan user dari polling Telegram dan menyimpannya ke storage.",
+                "operationId": "handleTelegramWebhook",
+                "requestBody": {
+                    "description": "Payload polling dari Telegram",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "user": {
+                                        "type": "string",
+                                        "example": "Fabian"
+                                    },
+                                    "option": {
+                                        "description": "Pilihan tempat",
+                                        "type": "string",
+                                        "enum": [
+                                            "Masjid",
+                                            "Basecamp"
+                                        ],
+                                        "example": "Masjid"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
-                        "description": "Polling berhasil dikirim"
-                    },
-                    "400": {
-                        "description": "Gagal mengirim polling"
+                        "description": "Webhook diterima",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "ok": {
+                                            "type": "boolean",
+                                            "example": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -36,8 +73,8 @@
     },
     "tags": [
         {
-            "name": "Telegram Bot",
-            "description": "Telegram Bot"
+            "name": "Telegram",
+            "description": "Telegram"
         }
     ]
 }
