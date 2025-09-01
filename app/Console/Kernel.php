@@ -15,8 +15,8 @@ class Kernel extends ConsoleKernel
         // Poll Dzuhur
         $schedule->command('send:poll dzuhur')->dailyAt('12:00');
 
-        // Poll Ashar
-        $schedule->command('send:poll ashar')->dailyAt('15:30');
+        // Poll Asar
+        $schedule->command('send:poll asar')->dailyAt('15:30');
     }
 
     /**

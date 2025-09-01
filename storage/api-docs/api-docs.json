@@ -22,34 +22,8 @@
                     "Telegram"
                 ],
                 "summary": "Handle Telegram Webhook",
-                "description": "Menerima pilihan user dari polling Telegram dan menyimpannya ke storage.",
+                "description": "Menerima pilihan user dari polling Telegram dan menyimpannya ke Google Sheets.",
                 "operationId": "handleTelegramWebhook",
-                "requestBody": {
-                    "description": "Payload polling dari Telegram",
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "user": {
-                                        "type": "string",
-                                        "example": "Fabian"
-                                    },
-                                    "option": {
-                                        "description": "Pilihan tempat",
-                                        "type": "string",
-                                        "enum": [
-                                            "Masjid",
-                                            "Basecamp"
-                                        ],
-                                        "example": "Masjid"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "200": {
                         "description": "Webhook diterima",
@@ -66,6 +40,194 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/api/telegram/test-poll": {
+            "post": {
+                "tags": [
+                    "Telegram"
+                ],
+                "summary": "Test Poll Submission",
+                "description": "Endpoint untuk testing manual polling tanpa melalui Telegram webhook. Bisa specify user, option, tanggal, dan waktu sholat.",
+                "operationId": "testPollSubmission",
+                "requestBody": {
+                    "description": "Data polling untuk testing",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "user",
+                                    "option",
+                                    "date",
+                                    "waktu"
+                                ],
+                                "properties": {
+                                    "user": {
+                                        "description": "Nama user yang voting",
+                                        "type": "string",
+                                        "example": "Fabian"
+                                    },
+                                    "option": {
+                                        "description": "Pilihan tempat sholat",
+                                        "type": "string",
+                                        "enum": [
+                                            "Masjid",
+                                            "Basecamp"
+                                        ],
+                                        "example": "Masjid"
+                                    },
+                                    "date": {
+                                        "description": "Tanggal polling (YYYY-MM-DD)",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2025-01-03"
+                                    },
+                                    "waktu": {
+                                        "description": "Waktu sholat",
+                                        "type": "string",
+                                        "enum": [
+                                            "dzuhur",
+                                            "asar"
+                                        ],
+                                        "example": "dzuhur"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Test poll berhasil diproses",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data berhasil disimpan ke Google Sheets"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "user": {
+                                                    "type": "string",
+                                                    "example": "Fabian"
+                                                },
+                                                "option": {
+                                                    "type": "string",
+                                                    "example": "Masjid"
+                                                },
+                                                "date": {
+                                                    "type": "string",
+                                                    "example": "2025-01-03"
+                                                },
+                                                "waktu": {
+                                                    "type": "string",
+                                                    "example": "dzuhur"
+                                                },
+                                                "row_updated": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "column_updated": {
+                                                    "type": "string",
+                                                    "example": "B"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User atau kolom tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User tidak ditemukan di Google Sheets"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/telegram/simple-test": {
+            "get": {
+                "tags": [
+                    "Telegram"
+                ],
+                "summary": "Simple Google Sheets Connection Test",
+                "description": "Endpoint untuk testing koneksi dasar ke Google Sheets",
+                "operationId": "90800d1bb85c1c4d3b3543a86dfa6283",
+                "responses": {
+                    "200": {
+                        "description": "Koneksi berhasil"
+                    },
+                    "500": {
+                        "description": "Koneksi gagal"
+                    }
+                }
+            }
+        },
+        "/api/telegram/debug-sheets": {
+            "get": {
+                "tags": [
+                    "Telegram"
+                ],
+                "summary": "Debug Google Sheets Connection",
+                "description": "Endpoint untuk debug koneksi dan struktur Google Sheets",
+                "operationId": "29f2cda8b52682aed133877a8c361471",
+                "responses": {
+                    "200": {
+                        "description": "Debug info berhasil diambil"
+                    },
+                    "500": {
+                        "description": "Gagal mendapatkan info"
                     }
                 }
             }

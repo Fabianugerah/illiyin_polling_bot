@@ -9,14 +9,14 @@ use Illuminate\Support\Facades\Storage;
 
 class SendTelegramPoll extends Command
 {
-    protected $signature = 'send:poll {waktu : dzuhur|ashar}';
+    protected $signature = 'send:poll {waktu : dzuhur|asar}';
     protected $description = 'Kirim polling sholat ke Telegram';
 
     public function handle()
     {
         $waktu = strtolower($this->argument('waktu'));
-        if (! in_array($waktu, ['dzuhur','ashar'])) {
-            $this->error('Argumen waktu harus dzuhur atau ashar');
+        if (! in_array($waktu, ['dzuhur','asar'])) {
+            $this->error('Argumen waktu harus dzuhur atau asar');
             return self::INVALID;
         }
 
@@ -37,10 +37,20 @@ class SendTelegramPoll extends Command
         $token  = env('TELEGRAM_BOT_TOKEN');
         $chatId = env('TELEGRAM_CHAT_ID');
 
+        if (! $token || ! $chatId) {
+            $this->error('Env TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID belum di-set.');
+            return self::INVALID;
+        }
+
+        // Pastikan folder polls ada
+        if (! Storage::exists('polls')) {
+            Storage::makeDirectory('polls');
+        }
+
         $question = "Sholat " . ucfirst($waktu) . " di Masjid ( $today )";
         $options  = ["Masjid", "Basecamp"];
 
-        $response = Http::post("https://api.telegram.org/bot{$token}/sendPoll", [
+        $response = Http::asForm()->post("https://api.telegram.org/bot{$token}/sendPoll", [
             'chat_id'      => $chatId,
             'question'     => $question,
             'options'      => json_encode($options),
@@ -53,13 +63,15 @@ class SendTelegramPoll extends Command
         }
 
         $data = $response->json();
+        $pollId = data_get($data, 'result.poll.id');
+
         // Simpan meta poll ke file summary
         $payload = [
             'sent_at'    => $now->toIso8601String(),
             'waktu'      => $waktu,
             'chat_id'    => $chatId,
             'message_id' => data_get($data, 'result.message_id'),
-            'poll_id'    => data_get($data, 'result.poll.id'),
+            'poll_id'    => $pollId,
             'question'   => $question,
             'options'    => $options,
         ];
@@ -69,6 +81,11 @@ class SendTelegramPoll extends Command
         $existing = Storage::exists($file) ? json_decode(Storage::get($file), true) : [];
         $existing[] = $payload;
         Storage::put($file, json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+         // Simpan metadata per-poll (fix: agar webhook bisa menemukan meski hari sudah ganti)
+        if ($pollId) {
+            Storage::put("polls/meta_{$pollId}.json", json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
 
         $this->info("Poll terkirim ($waktu). poll_id=".($payload['poll_id'] ?? '-'));
         return self::SUCCESS;
