@@ -11,12 +11,12 @@ Artisan::command('inspire', function () {
 // Dzuhur — Senin–Kamis (skip Jumat)
 Schedule::command('send:poll dzuhur')
     ->weekdays()
-    ->at('09:07')
+    ->at('08:58')
     ->timezone('Asia/Jakarta')
     ->when(fn () => ! now('Asia/Jakarta')->isFriday());
 
 // Asar — Senin–Jumat
 Schedule::command('send:poll asar')
     ->weekdays()
-    ->at('11:28')
+    ->at('09:03')
     ->timezone('Asia/Jakarta');

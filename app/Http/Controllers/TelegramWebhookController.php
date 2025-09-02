@@ -175,101 +175,6 @@ class TelegramWebhookController extends Controller
         }
     }
 
-    /**
-     * @OA\Get(
-     * path="/api/telegram/simple-test",
-     * summary="Simple Google Sheets Connection Test",
-     * description="Endpoint untuk testing koneksi dasar ke Google Sheets",
-     * tags={"Telegram"},
-     * @OA\Response(
-     * response=200,
-     * description="Koneksi berhasil"
-     * ),
-     * @OA\Response(
-     * response=500,
-     * description="Koneksi gagal"
-     * )
-     * )
-     */
-    public function simpleTest()
-    {
-        try {
-            $spreadsheetId = env('GOOGLE_SHEET_ID');
-
-            if (!$spreadsheetId) {
-                return response()->json(['error' => 'GOOGLE_SHEET_ID not found in .env'], 500);
-            }
-
-            // Test basic connection
-            $sheets = Sheets::spreadsheet($spreadsheetId);
-
-            // Try to get any data
-            $data = $sheets->all();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Connected to Google Sheets',
-                'data_count' => count($data),
-                'first_row' => $data[0] ?? null
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Get(
-     * path="/api/telegram/debug-sheets",
-     * summary="Debug Google Sheets Connection",
-     * description="Endpoint untuk debug koneksi dan struktur Google Sheets",
-     * tags={"Telegram"},
-     * @OA\Response(
-     * response=200,
-     * description="Debug info berhasil diambil"
-     * ),
-     * @OA\Response(
-     * response=500,
-     * description="Gagal mendapatkan info"
-     * )
-     * )
-     */
-    public function debugSheets()
-    {
-        try {
-            $spreadsheetId = env('GOOGLE_SHEET_ID');
-
-            if (!$spreadsheetId) {
-                return response()->json(['success' => false, 'message' => 'GOOGLE_SHEET_ID not found in .env'], 500);
-            }
-
-            $sheetsApi = Sheets::spreadsheet($spreadsheetId);
-            $sheets = $sheetsApi->sheetList();
-
-            $firstSheet = $sheets[0] ?? 'Sheet1';
-            $allData = $sheetsApi->sheet($firstSheet)->all();
-
-            return response()->json([
-                'success' => true,
-                'spreadsheet_id' => $spreadsheetId,
-                'sheet_list' => $sheets,
-                'active_sheet' => $firstSheet,
-                'header_row' => $allData[0] ?? [],
-                'first_few_rows' => array_slice($allData, 0, 5),
-                'total_rows' => count($allData)
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
-                'spreadsheet_id' => env('GOOGLE_SHEET_ID')
-            ], 500);
-        }
-    }
 
     /**
      * Handles a poll answer from Telegram.
@@ -366,26 +271,97 @@ class TelegramWebhookController extends Controller
             throw new \Exception('GOOGLE_SHEET_ID not configured.');
         }
 
-        $possibleSheetNames = ['2025', 'SEPTEMBER', 'AGUSTUS', 'JUNI'];
+        // Parse tanggal poll (fallback ke now jika parse gagal)
+        try {
+            $pollDate = Carbon::parse($pollMetadata['sent_at'])->timezone('Asia/Jakarta');
+        } catch (\Exception $e) {
+            Log::warning('Cannot parse poll sent_at, fallback to now: ' . ($pollMetadata['sent_at'] ?? 'null'));
+            $pollDate = Carbon::now('Asia/Jakarta');
+        }
+
+        // Mapping bulan ke nama tab (uppercase, bahasa Indonesia)
+        $monthMap = [
+            '01' => 'JANUARI',
+            '02' => 'FEBRUARI',
+            '03' => 'MARET',
+            '04' => 'APRIL',
+            '05' => 'MEI',
+            '06' => 'JUNI',
+            '07' => 'JULI',
+            '08' => 'AGUSTUS',
+            '09' => 'SEPTEMBER',
+            '10' => 'OKTOBER',
+            '11' => 'NOVEMBER',
+            '12' => 'DESEMBER'
+        ];
+
+        $monthNumber = $pollDate->format('m'); // "09"
+        $monthName   = $monthMap[$monthNumber] ?? strtoupper($pollDate->locale('id')->isoFormat('MMMM'));
+        $yearName    = $pollDate->format('Y'); // "2025"
+
+        Log::info("Selecting sheet tab for poll date", ['date' => $pollDate->toDateString(), 'month' => $monthName, 'year' => $yearName]);
+
+        $sheetsApi = Sheets::spreadsheet($spreadsheetId);
+
+        // Ambil daftar sheet yang tersedia (bila memungkinkan)
+        $availableSheets = [];
+        try {
+            $availableSheets = $sheetsApi->sheetList() ?: [];
+        } catch (\Exception $e) {
+            Log::warning("Unable to list sheets: " . $e->getMessage());
+        }
+
+        // Kandidat preferensi: bulan dulu, lalu tahun
+        $candidates = [$monthName, $yearName];
+
         $sheetName = null;
         $allData = null;
 
-        foreach ($possibleSheetNames as $testSheet) {
-            try {
-                $allData = Sheets::spreadsheet($spreadsheetId)->sheet($testSheet)->all();
-                if (!empty($allData)) {
-                    $sheetName = $testSheet;
-                    Log::info("Successfully using sheet: {$testSheet}");
-                    break;
+        // 1) Cari nama tab yang match di availableSheets (case-insensitive)
+        foreach ($candidates as $candidate) {
+            foreach ($availableSheets as $avail) {
+                if (strtoupper(trim($avail)) === strtoupper(trim($candidate))) {
+                    $sheetName = $avail; // gunakan nama persis dari sheetList()
+                    break 2;
                 }
-            } catch (\Exception $e) {
-                Log::warning("Sheet '{$testSheet}' not accessible: " . $e->getMessage());
             }
         }
 
-        if ($sheetName === null || empty($allData)) {
-            throw new \Exception("Tidak bisa terhubung ke Google Sheets. Cek nama sheet atau permissions.");
+        // 2) Jika belum ketemu lewat sheetList(), coba akses langsung candidate (ini untuk kasus sheetList gagal)
+        if ($sheetName === null) {
+            foreach ($candidates as $candidate) {
+                try {
+                    $tmp = $sheetsApi->sheet($candidate)->all();
+                    if (!empty($tmp)) {
+                        $sheetName = $candidate;
+                        $allData = $tmp;
+                        break;
+                    }
+                } catch (\Exception $e) {
+                    // ignore, coba candidate berikutnya
+                }
+            }
         }
+
+        // 3) Jika kita sudah menemukan sheetName dari sheetList tadi, ambil datanya
+        if ($sheetName !== null && $allData === null) {
+            try {
+                $allData = $sheetsApi->sheet($sheetName)->all();
+            } catch (\Exception $e) {
+                Log::warning("Failed to read sheet '{$sheetName}': " . $e->getMessage());
+                $allData = null;
+            }
+        }
+
+        // 4) Jika belum menemukan sheet yang cocok, berhenti dan beri tahu (lebih aman daripada mengambil sheet lain)
+        if ($sheetName === null || empty($allData)) {
+            $msg = "Tidak bisa menemukan tab untuk bulan '{$monthName}' atau tahun '{$yearName}'. "
+                . "Pastikan tab '{$monthName}' atau '{$yearName}' ada di spreadsheet dan service account memiliki akses.";
+            Log::error($msg, ['available_sheets' => $availableSheets]);
+            throw new \Exception($msg);
+        }
+
+        Log::info("Using sheet tab: {$sheetName}");
 
         // Cari index user di kolom A
         $userRowIndex = $this->findUserRow($allData, $userName);
@@ -407,11 +383,15 @@ class TelegramWebhookController extends Controller
 
         $columnIndex = $columnResult['index'];
         $columnLetter = $this->getColumnLetter($columnIndex);
+
+        // Jika sheet memakai checkbox, boolean true/false biasanya cocok.
+        // Jika tidak, kamu bisa mengganti 'TRUE' atau 'Hadir' sesuai kebutuhan.
         $value = ($choice === 'Masjid') ? true : false;
 
+        // Lakukan update
         $this->updateCell($spreadsheetId, $sheetName, $userRowIndex, $columnIndex, $value);
 
-        Log::info("Updated: {$userName} -> {$choice} di row {$userRowIndex}, col {$columnLetter}");
+        Log::info("Updated: {$userName} -> {$choice} di sheet {$sheetName} row {$userRowIndex}, col {$columnLetter}");
 
         return [
             'row_updated' => $userRowIndex,
@@ -419,6 +399,7 @@ class TelegramWebhookController extends Controller
             'value' => $value
         ];
     }
+
 
     /**
      * Finds the user's row index in the Google Sheet.
@@ -447,21 +428,43 @@ class TelegramWebhookController extends Controller
      */
     private function addNewUser($spreadsheetId, $sheetName, $userName)
     {
-        try {
-            $newRowIndex = count(Sheets::spreadsheet($spreadsheetId)->sheet($sheetName)->all()) + 1;
+        $allData = Sheets::spreadsheet($spreadsheetId)->sheet($sheetName)->all();
 
-            Sheets::spreadsheet($spreadsheetId)
-                ->sheet($sheetName)
-                ->range("A{$newRowIndex}")
-                ->update([[$userName]]);
+        $lastUserRowIndex = null;
 
-            Log::info("Added new user '{$userName}' at row {$newRowIndex}");
-            return $newRowIndex;
-        } catch (\Exception $e) {
-            Log::error("Error adding new user: " . $e->getMessage());
-            return null;
+        foreach ($allData as $rowIndex => $row) {
+            if (!empty($row[0])) {
+                $cellValue = strtolower(trim($row[0]));
+                // Skip baris summary
+                if (
+                    str_contains($cellValue, 'total member') ||
+                    str_contains($cellValue, 'jumlah sholat') ||
+                    str_contains($cellValue, 'total sholat') ||
+                    str_contains($cellValue, 'toleransi')
+                ) {
+                    break; // stop sebelum summary
+                }
+                // Baris ini dianggap user terakhir
+                $lastUserRowIndex = $rowIndex;
+            }
         }
+
+        if ($lastUserRowIndex === null) {
+            throw new \Exception("Tidak menemukan baris user untuk menaruh user baru.");
+        }
+
+        // Baris baru setelah user terakhir
+        $newRowIndex = $lastUserRowIndex + 2; // +1 untuk row selanjutnya, +1 karena index API mulai dari 0
+
+        $range = "{$sheetName}!A{$newRowIndex}";
+        Sheets::spreadsheet($spreadsheetId)
+            ->sheet($sheetName)
+            ->range($range)
+            ->update([[$userName]]);
+
+        return $newRowIndex;
     }
+
 
     /**
      * Finds the correct column index based on poll metadata.
@@ -528,8 +531,6 @@ class TelegramWebhookController extends Controller
 
         return ['index' => $targetColumn, 'debug' => $debugInfo];
     }
-
-
 
     /**
      * Updates a single cell in Google Sheets.

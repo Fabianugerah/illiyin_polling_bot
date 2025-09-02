@@ -195,42 +195,6 @@
                     }
                 }
             }
-        },
-        "/api/telegram/simple-test": {
-            "get": {
-                "tags": [
-                    "Telegram"
-                ],
-                "summary": "Simple Google Sheets Connection Test",
-                "description": "Endpoint untuk testing koneksi dasar ke Google Sheets",
-                "operationId": "90800d1bb85c1c4d3b3543a86dfa6283",
-                "responses": {
-                    "200": {
-                        "description": "Koneksi berhasil"
-                    },
-                    "500": {
-                        "description": "Koneksi gagal"
-                    }
-                }
-            }
-        },
-        "/api/telegram/debug-sheets": {
-            "get": {
-                "tags": [
-                    "Telegram"
-                ],
-                "summary": "Debug Google Sheets Connection",
-                "description": "Endpoint untuk debug koneksi dan struktur Google Sheets",
-                "operationId": "29f2cda8b52682aed133877a8c361471",
-                "responses": {
-                    "200": {
-                        "description": "Debug info berhasil diambil"
-                    },
-                    "500": {
-                        "description": "Gagal mendapatkan info"
-                    }
-                }
-            }
         }
     },
     "tags": [
