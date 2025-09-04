@@ -83,7 +83,7 @@
                                         "description": "Tanggal polling (YYYY-MM-DD)",
                                         "type": "string",
                                         "format": "date",
-                                        "example": "2025-01-03"
+                                        "example": "2025-08-06"
                                     },
                                     "waktu": {
                                         "description": "Waktu sholat",
@@ -127,7 +127,7 @@
                                                 },
                                                 "date": {
                                                     "type": "string",
-                                                    "example": "2025-01-03"
+                                                    "example": "2025-08-06"
                                                 },
                                                 "waktu": {
                                                     "type": "string",

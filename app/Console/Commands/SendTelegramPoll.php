@@ -16,7 +16,7 @@ class SendTelegramPoll extends Command
     {
         $waktu = strtolower($this->argument('waktu'));
         if (! in_array($waktu, ['dzuhur','asar'])) {
-            $this->error('Argumen waktu harus dzuhur atau asar');
+            $this->error('Command harus waktu dzuhur atau asar');
             return self::INVALID;
         }
 
