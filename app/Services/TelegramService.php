@@ -17,10 +17,11 @@ class TelegramService
     public function handlePollAnswer(array $pollAnswer): void
     {
         $pollId = $pollAnswer['poll_id'];
+        $userId = $pollAnswer['user']['id'];
         $userName = $pollAnswer['user']['first_name'] ?? 'Unknown';
         $optionIndex = $pollAnswer['option_ids'][0] ?? null;
 
-        // Ambil metadata poll untuk mengetahui tanggal dan waktu sholat
+        // Perbaikan: Gunakan logika getPollMetadata yang diperbarui
         $pollMetadata = $this->getPollMetadata($pollId);
         if (!$pollMetadata) {
             Log::warning("Poll metadata tidak ditemukan untuk poll_id: {$pollId}");
@@ -30,10 +31,12 @@ class TelegramService
         $options = $pollMetadata['options'] ?? ['Masjid', 'Basecamp'];
         $choice = $options[$optionIndex] ?? 'Tarik Suara';
 
-        $this->saveToJson($pollId, $userName, $choice);
+        // Perbaikan: Tambahkan userId ke saveToJson
+        $this->saveToJson($pollId, $userId, $userName, $choice);
 
         try {
-            $this->updateGoogleSheets($userName, $choice, $pollMetadata);
+            // Perbaikan: Panggil updateGoogleSheets dengan parameter yang benar
+            $this->updateGoogleSheets($userId, $choice, $pollMetadata);
         } catch (\Exception $e) {
             Log::error("Error updating Google Sheets from webhook: " . $e->getMessage());
         }
@@ -41,21 +44,14 @@ class TelegramService
 
     /**
      * A helper method to perform the Google Sheets update logic.
-     *
-     * @param string $userName
-     * @param string $choice
-     * @param array $pollMetadata
-     * @return array
-     * @throws \Exception
      */
-    public function updateGoogleSheets(string $userName, string $choice, array $pollMetadata): array
+    public function updateGoogleSheets(string $userId, string $choice, array $pollMetadata): array
     {
         $spreadsheetId = env('GOOGLE_SHEET_ID');
         if (!$spreadsheetId) {
             throw new \Exception('GOOGLE_SHEET_ID not configured.');
         }
 
-        // Parse tanggal polling dari metadata
         try {
             $pollDate = Carbon::parse($pollMetadata['sent_at'])->timezone('Asia/Jakarta');
         } catch (\Exception $e) {
@@ -97,12 +93,14 @@ class TelegramService
             throw new \Exception("Tab '{$sheetName}' kosong atau tidak bisa dibaca.");
         }
 
-        $userRowIndex = $this->findUserRow($allData, $userName);
+        $userRowIndex = $this->findUserRow($allData, (string) $userId); // Perbaikan: Pastikan userId adalah string
         if ($userRowIndex === null) {
-            $msg = "User '{$userName}' tidak ditemukan di Google Sheets tab '{$sheetName}'.";
-            Log::warning($msg, ['user' => $userName, 'sheet' => $sheetName]);
+            $msg = "User dengan ID '{$userId}' tidak ditemukan di Google Sheets tab '{$sheetName}'.";
+            Log::warning($msg, ['user' => $userId, 'sheet' => $sheetName]);
             throw new \Exception($msg);
         }
+
+        $userName = $allData[$userRowIndex - 1][1] ?? null;
 
         $columnResult = $this->findCorrectColumn($pollMetadata, $allData);
         if ($columnResult['index'] === null) {
@@ -114,24 +112,26 @@ class TelegramService
         $value = ($choice === 'Masjid') ? true : false;
 
         $this->updateCell($spreadsheetId, $sheetName, $userRowIndex, $columnIndex, $value);
-        Log::info("Updated: {$userName} -> {$choice} di sheet {$sheetName} row {$userRowIndex}, col {$columnLetter}");
+        Log::info("Updated: {$userId} -> {$choice} di sheet {$sheetName} row {$userRowIndex}, col {$columnLetter}");
 
         return [
             'row_updated' => $userRowIndex,
             'column_updated' => $columnLetter,
-            'value' => $value
+            'value' => $value,
+            'user_name' => $userName,
         ];
     }
 
     /**
      * Saves poll answers to a JSON file.
      */
-    public function saveToJson(string $pollId, string $userName, string $choice): void
+    public function saveToJson(string $pollId, string $userId, string $userName, string $choice): void
     {
-        $filename = "polls/{$pollId}.json";
+        $filename = "polls/answers_{$pollId}.json"; // Perbaikan: Simpan jawaban di file terpisah
         $data = Storage::exists($filename) ? json_decode(Storage::get($filename), true) : ['answers' => []];
 
         $data['answers'][] = [
+            'user_id' => $userId,
             'user' => $userName,
             'option' => $choice,
             'time' => now()->toDateTimeString(),
@@ -145,20 +145,14 @@ class TelegramService
      */
     private function getPollMetadata(string $pollId): ?array
     {
-        $dailyFile = "polls/" . Carbon::now('Asia/Jakarta')->toDateString() . ".json";
+        // Perbaikan: Cari metadata di file per-poll
+        $filename = "polls/meta_{$pollId}.json";
 
-        if (!Storage::exists($dailyFile)) {
-            Log::warning("Daily poll file not found: {$dailyFile}");
-            return null;
+        if (Storage::exists($filename)) {
+            return json_decode(Storage::get($filename), true);
         }
 
-        $dailyData = json_decode(Storage::get($dailyFile), true);
-
-        foreach ($dailyData as $pollData) {
-            if ($pollData['poll_id'] === $pollId) {
-                return $pollData;
-            }
-        }
+        Log::warning("Poll metadata file not found: {$filename}");
         return null;
     }
 
@@ -174,7 +168,6 @@ class TelegramService
                 }
             }
         }
-
         foreach ($candidates as $candidate) {
             try {
                 if (!empty($sheetsApi->sheet($candidate)->all())) {
@@ -190,10 +183,10 @@ class TelegramService
     /**
      * Finds the user's row index in the Google Sheet.
      */
-    private function findUserRow(array $allData, string $userName): ?int
+    private function findUserRow(array $allData, string $userId): ?int
     {
         foreach ($allData as $index => $row) {
-            if (isset($row[0]) && trim(strtolower($row[0])) === trim(strtolower($userName))) {
+            if (isset($row[0]) && trim($row[0]) === trim($userId)) {
                 return $index + 1;
             }
         }

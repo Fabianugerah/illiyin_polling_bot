@@ -18,5 +18,5 @@ Schedule::command('send:poll dzuhur')
 // Asar — Senin–Jumat
 Schedule::command('send:poll asar')
     ->weekdays()
-    ->at('13:12')
+    ->at('11:13')
     ->timezone('Asia/Jakarta');

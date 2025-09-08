@@ -50,7 +50,7 @@
                     "Telegram"
                 ],
                 "summary": "Test Poll Submission",
-                "description": "Endpoint untuk testing manual polling tanpa melalui Telegram webhook. Bisa specify user, option, tanggal, dan waktu sholat.",
+                "description": "Endpoint untuk testing manual polling. Harus menggunakan Telegram ID sebagai user identifier.",
                 "operationId": "testPollSubmission",
                 "requestBody": {
                     "description": "Data polling untuk testing",
@@ -59,16 +59,16 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "user",
+                                    "user_id",
                                     "option",
                                     "date",
                                     "waktu"
                                 ],
                                 "properties": {
-                                    "user": {
-                                        "description": "Nama user yang voting",
+                                    "user_id": {
+                                        "description": "Telegram User ID",
                                         "type": "string",
-                                        "example": "Fabian"
+                                        "example": "5459494803"
                                     },
                                     "option": {
                                         "description": "Pilihan tempat sholat",
@@ -117,9 +117,9 @@
                                         },
                                         "data": {
                                             "properties": {
-                                                "user": {
+                                                "user_id": {
                                                     "type": "string",
-                                                    "example": "Fabian"
+                                                    "example": "5459494803"
                                                 },
                                                 "option": {
                                                     "type": "string",

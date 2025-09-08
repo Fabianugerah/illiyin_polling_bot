@@ -60,7 +60,7 @@ class TelegramWebhookController extends Controller
      * @OA\Post(
      * path="/api/telegram/test-poll",
      * summary="Test Poll Submission",
-     * description="Endpoint untuk testing manual polling tanpa melalui Telegram webhook. Bisa specify user, option, tanggal, dan waktu sholat.",
+     * description="Endpoint untuk testing manual polling. Harus menggunakan Telegram ID sebagai user identifier.",
      * operationId="testPollSubmission",
      * tags={"Telegram"},
      * @OA\RequestBody(
@@ -68,8 +68,8 @@ class TelegramWebhookController extends Controller
      * description="Data polling untuk testing",
      * @OA\JsonContent(
      * type="object",
-     * required={"user", "option", "date", "waktu"},
-     * @OA\Property(property="user", type="string", example="Fabian", description="Nama user yang voting"),
+     * required={"user_id", "option", "date", "waktu"},
+     * @OA\Property(property="user_id", type="string", example="5459494803", description="Telegram User ID"),
      * @OA\Property(
      * property="option",
      * type="string",
@@ -101,7 +101,7 @@ class TelegramWebhookController extends Controller
      * @OA\Property(property="success", type="boolean", example=true),
      * @OA\Property(property="message", type="string", example="Data berhasil disimpan ke Google Sheets"),
      * @OA\Property(property="data", type="object",
-     * @OA\Property(property="user", type="string", example="Fabian"),
+     * @OA\Property(property="user_id", type="string", example="5459494803"),
      * @OA\Property(property="option", type="string", example="Masjid"),
      * @OA\Property(property="date", type="string", example="2025-08-06"),
      * @OA\Property(property="waktu", type="string", example="dzuhur"),
@@ -135,7 +135,7 @@ class TelegramWebhookController extends Controller
     {
         try {
             $validated = $request->validate([
-                'user'    => 'required|string|max:100',
+                'user_id' => 'required|string|max:100',
                 'option'  => 'required|in:Masjid,Basecamp',
                 'date'    => 'required|date_format:Y-m-d',
                 'waktu'   => 'required|in:dzuhur,asar'
@@ -149,8 +149,12 @@ class TelegramWebhookController extends Controller
                 'options'  => ['Masjid', 'Basecamp']
             ];
 
-            $this->telegramService->saveToJson($pollMetadata['poll_id'], $validated['user'], $validated['option']);
-            $updateResult = $this->telegramService->updateGoogleSheets($validated['user'], $validated['option'], $pollMetadata);
+            // Ganti pemanggilan updateGoogleSheets dan saveToJson
+
+            $updateResult = $this->telegramService->updateGoogleSheets($validated['user_id'], $validated['option'], $pollMetadata);
+            $userName = $updateResult['user_name'] ?? 'Unknown';
+
+            $this->telegramService->saveToJson($pollMetadata['poll_id'], $validated['user_id'], $userName, $validated['option']);
 
             return response()->json([
                 'success' => true,
